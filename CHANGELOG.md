@@ -2,6 +2,15 @@
 
 > **Note:** This file only contains high‑level features or important fixes.
 
+## [v5.0.0-1.0.0] – 2026-08-31
+
+- **Release**: ERI Robotics customized QGroundControl 5.0 build for 64-bit ARM Android devices.
+- **Video and Camera**: Added custom main/PiP stream controls, recording and snapshot controls, and stream recovery.
+- **Flight HUD**: Added ToF state, `CP_DIST`-based brake indication, recording status, Wi-Fi percentage, CPU temperature, and custom relative-position display.
+- **Controller and MAVLink**: Added G4 auxiliary-control handling and custom status-message overlays.
+
+---
+
 ## [5.0] – Daily Build
 
 - **New UI**: Combined compass + attitude instrument for enhanced navigation.
