@@ -132,13 +132,27 @@ void CustomQGCApplication::_handleTextMessage(int sysid, int componentid, int se
     Q_UNUSED(description)
 
     QString displayMessage;
+    QString messageKey;
     bool persistent = false;
-    if (!_parseStatusOverlayMessage(text, displayMessage, persistent)) {
+    if (!_parseStatusOverlayMessage(text, displayMessage, persistent, messageKey)) {
+        return;
+    }
+
+    // W-510 indicates that the ESC is no longer in the C-510 overheat state.
+    // Use it only to clear that critical overlay; do not show an 80 C warning.
+    if (messageKey == QStringLiteral("W-510|ESC High Temperature")) {
+        if (_persistentStatusOverlayKey == QStringLiteral("C-510|ESC Overheat")) {
+            _statusOverlayTimer.stop();
+            _persistentStatusOverlayMessage.clear();
+            _persistentStatusOverlayKey.clear();
+            _setStatusOverlayMessage(QString());
+        }
         return;
     }
 
     if (persistent) {
         _persistentStatusOverlayMessage = displayMessage;
+        _persistentStatusOverlayKey = messageKey;
         _statusOverlayTimer.stop();
         _setStatusOverlayMessage(_persistentStatusOverlayMessage);
         return;
@@ -150,12 +164,11 @@ void CustomQGCApplication::_handleTextMessage(int sysid, int componentid, int se
     }
 }
 
-bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent) const
+bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey) const
 {
     static const QRegularExpression codeExpression(QStringLiteral("^<([CEWID])-([0-9]{3})>\\s*(.*)$|^([CEWID])-([0-9]{3})\\b\\s*(.*)$"));
     static const QHash<QString, QString> exactMessages {
         { QStringLiteral("C-510|ESC Overheat"), QStringLiteral("<C-510> ESC温度が100℃を超過しました") },
-        { QStringLiteral("W-510|ESC High Temperature"), QStringLiteral("<W-510> ESC温度が80℃を超過しました") },
         { QStringLiteral("E-210|Abnormal Vibration"), QStringLiteral("<E-010> 異常振動を検知しました") },
     };
 
@@ -176,6 +189,7 @@ bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QStri
     const QString code = QStringLiteral("%1-%2").arg(levelText, numberText);
     const int genre = numberText.left(1).toInt();
     const QString exactKey = QStringLiteral("%1|%2").arg(code, shortText);
+    messageKey = exactKey;
     persistent = (level == QLatin1Char('C') || level == QLatin1Char('E'));
 
     const auto exactMessage = exactMessages.constFind(exactKey);
@@ -253,6 +267,7 @@ void CustomQGCApplication::_clearStatusOverlay()
 {
     _statusOverlayTimer.stop();
     _persistentStatusOverlayMessage.clear();
+    _persistentStatusOverlayKey.clear();
     _setStatusOverlayMessage(QString());
 }
 

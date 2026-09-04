@@ -58,7 +58,7 @@ private slots:
     void _handleTransientStatusOverlayTimeout();
 
 private:
-    bool _parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent) const;
+    bool _parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey) const;
     QString _translatedStatusText(const QString &code, QChar level, int genre) const;
     void _setStatusOverlayMessage(const QString &message);
     void _clearStatusOverlay();
@@ -70,5 +70,6 @@ private:
     QSettings _settings;
     QString _statusOverlayMessage;
     QString _persistentStatusOverlayMessage;
+    QString _persistentStatusOverlayKey;
     QTimer _statusOverlayTimer;
 };
