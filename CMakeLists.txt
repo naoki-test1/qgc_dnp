@@ -83,6 +83,12 @@ endif()
 # ----------------------------------------------------------------------------
 include(Git)
 
+# Custom derivatives can provide a stable user-facing version independently of
+# the numeric project version required by CMake's project(VERSION) command.
+if(QGC_CUSTOM_VERSION_NAME)
+    set(QGC_APP_VERSION_STR "v${QGC_CUSTOM_VERSION_NAME}")
+endif()
+
 # ----------------------------------------------------------------------------
 # Compiler Caching Configuration
 # ----------------------------------------------------------------------------
