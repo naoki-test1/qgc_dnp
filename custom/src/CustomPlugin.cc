@@ -7,6 +7,7 @@
 #include "CustomPlugin.h"
 
 #include "CustomQGCApplication.h"
+#include "PhotoPreviewCapture.h"
 #include "QVIOHandler.h"
 #include "Video/VideoHandler.h"
 
@@ -59,6 +60,8 @@ bool CustomOptions::enablePlanViewSelector() const
 CustomPlugin::CustomPlugin(QObject *parent)
     : QGCCorePlugin(parent)
 {
+    qmlRegisterType<PhotoPreviewCapture>("QGroundControl", 1, 0, "PhotoPreviewCapture");
+    qmlRegisterAnonymousType<PhotoCaptureFeedback>("QGroundControl", 1);
 }
 
 QGCCorePlugin *CustomPlugin::instance()

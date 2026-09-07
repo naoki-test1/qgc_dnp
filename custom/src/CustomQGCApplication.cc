@@ -8,6 +8,8 @@
 
 #include "MultiVehicleManager.h"
 #include "QGCApplication.h"
+#include "QGCCameraManager.h"
+#include "MavlinkCameraControl.h"
 #include "QGCLoggingCategory.h"
 #include "SettingsManager.h"
 #include "Settings/VideoSettings.h"
@@ -42,6 +44,12 @@ CustomQGCApplication::CustomQGCApplication(QObject *parent)
     : QObject(parent)
     , _videoHandler(VideoHandler::instance())
 {
+#ifdef Q_OS_ANDROID
+    _shutterSound = QJniObject("android/media/MediaActionSound");
+    if (_shutterSound.isValid()) {
+        _shutterSound.callMethod<void>("load", "(I)V", jint(0)); // SHUTTER_CLICK
+    }
+#endif
     _statusOverlayTimer.setSingleShot(true);
     _statusOverlayTimer.setInterval(kStatusOverlayWarningMs);
     connect(&_statusOverlayTimer, &QTimer::timeout, this, &CustomQGCApplication::_handleTransientStatusOverlayTimeout);
@@ -59,6 +67,24 @@ CustomQGCApplication::CustomQGCApplication(QObject *parent)
         connect(_videoHandler, &VideoHandler::mainUrlChanged, this, &CustomQGCApplication::_persistUrls);
         connect(_videoHandler, &VideoHandler::subUrlChanged, this, &CustomQGCApplication::_persistUrls);
     }
+}
+
+CustomQGCApplication::~CustomQGCApplication()
+{
+#ifdef Q_OS_ANDROID
+    if (_shutterSound.isValid()) {
+        _shutterSound.callMethod<void>("release", "()V");
+    }
+#endif
+}
+
+void CustomQGCApplication::playShutterSound()
+{
+#ifdef Q_OS_ANDROID
+    if (_shutterSound.isValid()) {
+        _shutterSound.callMethod<void>("play", "(I)V", jint(0)); // SHUTTER_CLICK
+    }
+#endif
 }
 
 void CustomQGCApplication::recordStart()
@@ -81,6 +107,24 @@ void CustomQGCApplication::recordStop()
 
     _vehicle->sendMavCommand(MAV_COMP_ID_CAMERA, MAV_CMD_VIDEO_STOP_CAPTURE, true,
                              0 /* camera id */, 0, 0, 0, 0, 0, 0);
+}
+
+bool CustomQGCApplication::takePhoto(MavlinkCameraControl *camera)
+{
+    if (!_vehicle || !camera || !_vehicle->cameraManager()
+        || camera != _vehicle->cameraManager()->currentCameraInstance()) {
+        return false;
+    }
+    if (!_photoFeedback.begin(_vehicle->id(), camera->compID())) {
+        return false;
+    }
+    // Keep the current camera/video mode; unsupported in-mode capture fails normally.
+    camera->setPhotoCaptureMode(MavlinkCameraControl::PHOTO_CAPTURE_SINGLE);
+    if (!camera->takePhoto()) {
+        _photoFeedback.commandRejected(_vehicle->id(), camera->compID());
+        return false;
+    }
+    return true;
 }
 
 void CustomQGCApplication::snapshot()
@@ -109,6 +153,7 @@ void CustomQGCApplication::_activeVehicleChanged(Vehicle *vehicle)
         disconnect(_vehicle, &Vehicle::textMessageReceived, this, &CustomQGCApplication::_handleTextMessage);
     }
 
+    _photoFeedback.reset();
     _vehicle = vehicle;
     _tofHandler.setDistanceMm(0);
     _clearStatusOverlay();
@@ -122,6 +167,19 @@ void CustomQGCApplication::_activeVehicleChanged(Vehicle *vehicle)
 void CustomQGCApplication::_handleMavlinkMessage(const mavlink_message_t &message)
 {
     _qvioHandler.updateFromMavlink(message);
+    if (message.msgid == MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED) {
+        mavlink_camera_image_captured_t captured;
+        mavlink_msg_camera_image_captured_decode(&message, &captured);
+        _photoFeedback.imageCaptured(message.sysid, message.compid, captured.image_index,
+                                     captured.time_boot_ms, captured.capture_result);
+    } else if (message.msgid == MAVLINK_MSG_ID_COMMAND_ACK) {
+        mavlink_command_ack_t ack;
+        mavlink_msg_command_ack_decode(&message, &ack);
+        if (ack.command == MAV_CMD_IMAGE_START_CAPTURE && ack.result != MAV_RESULT_ACCEPTED
+            && ack.result != MAV_RESULT_IN_PROGRESS) {
+            _photoFeedback.commandRejected(message.sysid, message.compid);
+        }
+    }
 }
 
 void CustomQGCApplication::_handleTextMessage(int sysid, int componentid, int severity, QString text, QString description)

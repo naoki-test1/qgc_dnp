@@ -29,6 +29,10 @@ set(CUSTOM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CustomPlugin.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CustomQGCApplication.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CustomQGCApplication.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PhotoPreviewCapture.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PhotoPreviewCapture.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PhotoCaptureFeedback.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PhotoCaptureFeedback.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QVIOHandler.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/QVIOHandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ToFHandler.cc

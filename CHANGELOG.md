@@ -2,12 +2,106 @@
 
 > **Note:** This file only contains high‑level features or important fixes.
 
+## [v5.0.0-1.0.2] – 2026-09-07
+
+- **Shutter feedback**: Play the Android device's native shutter sound when the photo button is clicked.
+- **Photo preview**: Show a thumbnail with saving, saved, failed, or unconfirmed status.
+- **Save confirmation**: Confirm a saved photo only after a matching `CAMERA_IMAGE_CAPTURED` success message; time out after 15 seconds without confirmation.
+- **Camera controls**: Capture one photo without changing the current camera/video mode and prevent another capture while saving.
+- **PiP UI**: Remove the floating Add PiP control; retain stream configuration in settings.
+- **VOXL compatibility**: Save confirmation requires a camera bridge that emits `CAMERA_IMAGE_CAPTURED`, such as the validated `voxl-mavcam-shutter` save-confirmation update. An accepted shutter command alone does not confirm a saved file.
+
+## Custom v5.0.0 version history
+
+The `customN` names identify archived Android build iterations. The application
+version remains QGroundControl 5.0.0; the embedded Git revision identifies the
+committed source used for each APK. Builds with the same revision can still be
+different APK artifacts, so they are not necessarily byte-for-byte identical.
+
+| Version | Embedded APK revision | Source relationship |
+| --- | --- | --- |
+| `v5.0.0-custom1` | `ef4ff6dca` | First archived revision in this series |
+| `v5.0.0-custom2` | `ef4ff6dca` | Same committed source as `custom1` |
+| `v5.0.0-custom3` | Not available | No APK or matching source revision was supplied |
+| `v5.0.0-custom4` | `e12b1afe3` | Newer committed source than `custom2` |
+| `v5.0.0-custom5` | `e12b1afe3` | Same committed source as `custom4` |
+| `v5.0.0-custom6` | `e12b1afe3` | Same committed source as `custom4` and `custom5` |
+| `v5.0.0-custom7` | `be0e48e27` | Newer committed source than `custom6` |
+| `v5.0.0-custom8` | `c322549be` | Newer committed source than `custom7` |
+| `v5.0.0-custom9` | `c322549be` | Same committed source as `custom8` |
+| `v5.0.0-custom10` | `c322549be` | Same committed source as `custom8` and `custom9` |
+| `v5.0.0-custom11` | `f50f27c87` | Latest archived custom APK source |
+| `v5.0.0-1.0.0` | `be0e48e27` | Published APK is source-equivalent to `custom7` |
+
 ## [v5.0.0-1.0.0] – 2026-08-31
 
 - **Release**: ERI Robotics customized QGroundControl 5.0 build for 64-bit ARM Android devices.
-- **Video and Camera**: Added custom main/PiP stream controls, recording and snapshot controls, and stream recovery.
-- **Flight HUD**: Added ToF state, `CP_DIST`-based brake indication, recording status, Wi-Fi percentage, CPU temperature, and custom relative-position display.
-- **Controller and MAVLink**: Added G4 auxiliary-control handling and custom status-message overlays.
+- **APK source**: The published APK embeds revision `be0e48e27`, the same
+  committed source revision as `v5.0.0-custom7`.
+- **Tag mismatch**: The Git tag points to `ed7500e09`, but the published APK was
+  not built from that revision. Functions added after `custom7` are therefore
+  absent from the current `v5.0.0-1.0.0` APK.
+
+### [v5.0.0-custom11] – 2026-06-02
+
+Changes since the source used by `custom10`:
+
+- **Settings and PiP**: Replaced the separate PiP controls with a unified
+  settings panel containing RTSP configuration, PiP clearing, and the active
+  communication endpoint.
+- **VOXL shutdown**: Added a confirmation-protected safe-shutdown request using
+  custom MAVLink message `CUSMVL_SAFE_SHUTDOWN` (`42010`), with pending,
+  success, error, and timeout status feedback.
+- **Video recovery**: Added retry backoff and improved stream restart handling.
+- **Flight HUD**: Added ToF ON/OFF state and `CP_DIST`-based BRK indication.
+- **Networking**: Added active UDP peer endpoint tracking, with TCP/UDP
+  configuration fallback for display in the settings panel.
+
+### [v5.0.0-custom8–custom10] – 2026-05-11
+
+All three APKs embed revision `c322549be`; there are no committed source changes
+between `custom8`, `custom9`, and `custom10`.
+
+- **Controller**: Added G4 dial calibration handling.
+- **Flight HUD**: Adjusted the compass and changed the relative-position display
+  to the S/D/H format.
+- **Telemetry UI**: Changed Wi-Fi strength to percentage display and added a
+  dedicated `STATUSTEXT` error overlay.
+- **UI**: Applied additional layout and presentation adjustments.
+- **Build tooling**: Added and repaired Windows custom-build/NSIS workflows,
+  added Linux diagnostics, and changed GitHub Actions to manual execution.
+
+### [v5.0.0-custom7] – 2026-04-01
+
+- **Controller**: Added normalized G4 auxiliary-axis handling and auxiliary
+  debugging information.
+- **Flight HUD**: Added CPU temperature and reorganized debug information.
+- **Recording UI**: Adjusted level/recording layout and added more `REC_STAT`
+  states.
+
+### [v5.0.0-custom4–custom6] – 2026-03-19
+
+All three APKs embed revision `e12b1afe3`; there are no committed source changes
+between `custom4`, `custom5`, and `custom6`.
+
+- **Video UI**: Moved the level indicator, resized/repositioned PiP, adjusted the
+  camera and recording layout, and added a main-video crosshair.
+- **Controller and MAVLink**: Added RC auxiliary-axis transmission and settled
+  on normalized `MANUAL_CONTROL` auxiliary values after intermediate raw and
+  ±1000-scale implementations.
+- **Recording status**: Added recording-state display and refined `REC_STAT`
+  wording and colors.
+- **Communications**: Fixed link deletion behavior.
+
+### [v5.0.0-custom1–custom2] – 2026-03-11
+
+Both APKs embed revision `ef4ff6dca`; there are no committed source changes
+between `custom1` and `custom2`.
+
+- **Android UI and telemetry**: Added the initial custom Android UI and fixed
+  TIMESYNC transmission.
+- **Battery telemetry**: Ignored invalid extended `BATTERY_STATUS` voltages.
+- **Android signing**: Added support for loading local signing configuration.
 
 ---
 

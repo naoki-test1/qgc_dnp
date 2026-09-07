@@ -24,7 +24,6 @@ ApplicationWindow {
     onClosing: Qt.quit()
 
     readonly property var activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
-    property bool showPipAddPanel: false
     readonly property bool _hasVideoHandler: typeof videoHandler !== "undefined" && videoHandler !== null
     readonly property bool _displaySwapped: _hasVideoHandler ? videoHandler.displaySwapped : false
     readonly property real _topHudInset: ScreenTools.isMobile ? ScreenTools.defaultFontPixelHeight * 0.6 : 0
@@ -592,6 +591,21 @@ ApplicationWindow {
                     z: 0
                 }
 
+                PhotoPreviewCapture { id: photoPreviewCapture }
+
+                PhotoCapturePreview {
+                    id: photoCapturePreview
+                    frameCapture: photoPreviewCapture
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: ScreenTools.defaultFontPixelHeight * 1.5
+                    width: Math.min(parent.width * 0.24, ScreenTools.defaultFontPixelHeight * 12)
+                    z: 30
+                    feedback: typeof customApp !== "undefined" ? customApp.photoFeedback : null
+                    videoSurface: mainVideo.surfaceItem
+                    streaming: mainVideo._streaming
+                }
+
                 // HUD overlay layer on top of video
                 Item {
                     id: hudLayer
@@ -807,6 +821,9 @@ ApplicationWindow {
                         readonly property var activeVehicle: globals.activeVehicle
                         readonly property var cameraManager: globals.activeVehicle ? globals.activeVehicle.cameraManager : null
                         readonly property var activeCamera: cameraManager ? cameraManager.currentCameraInstance : null
+                        onActiveCameraChanged: {
+                            if (typeof customApp !== "undefined") customApp.photoFeedback.clear()
+                        }
                         property bool recStatusPopupVisible: false
                         readonly property real badgeHorizontalPadding: ScreenTools.defaultFontPixelWidth * 0.9
                         readonly property real cameraIconOffsetX: -ScreenTools.defaultFontPixelWidth * 0.18
@@ -989,7 +1006,7 @@ ApplicationWindow {
                                             width: shutterButtonOuter.clickPulseActive ? shutterButtonOuter.innerButtonBaseSize * 0.82 : shutterButtonOuter.innerButtonBaseSize
                                             height: width
                                             radius: width * 0.5
-                                            color: "#ffffff"
+                                            color: shutterButtonOuter.clickPulseActive ? "#39cf7b" : "#ffffff"
 
                                             Behavior on width {
                                                 NumberAnimation {
@@ -1016,17 +1033,20 @@ ApplicationWindow {
                                         MouseArea {
                                             id: shutterButtonMouseArea
                                             anchors.fill: parent
-                                            enabled: !!cameraStorageBadge.activeCamera
+                                            enabled: !!cameraStorageBadge.activeCamera && typeof customApp !== "undefined"
+                                                && customApp.photoFeedback.state !== "saving"
                                             onPressed: {
                                                 shutterButtonOuter.clickPulseActive = true
                                                 shutterButtonPulseTimer.restart()
                                             }
                                             onClicked: {
-                                                cameraStorageBadge.activeCamera.setCameraModePhoto()
                                                 if (cameraStorageBadge.activeCamera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_INTERVAL_IN_PROGRESS) {
                                                     cameraStorageBadge.activeCamera.stopTakePhoto()
                                                 } else {
-                                                    cameraStorageBadge.activeCamera.takePhoto()
+                                                    customApp.playShutterSound()
+                                                    customApp.photoFeedback.clear()
+                                                    photoCapturePreview.prepareThumbnail()
+                                                    customApp.takePhoto(cameraStorageBadge.activeCamera)
                                                 }
                                             }
                                         }
@@ -1185,155 +1205,7 @@ ApplicationWindow {
                     onSwapRequested: customApp.swapCamera()
                 }
 
-                // PiP非表示時の追加ボタン＋URL入力パネル
-                Item {
-                    id: pipAddContainer
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: ScreenTools.defaultFontPixelHeight * 1.5
-                    anchors.rightMargin: ScreenTools.defaultFontPixelWidth * 8
-                    visible: _hasVideoHandler && videoHandler.subUrl === ""
-                    width: 340
-                    // Sub URLのラベル/入力欄を入力欄2.5個分だけ下げる
-                    property real subUrlInputHeight: ScreenTools.defaultFontPixelHeight * 2.5
-                    property real subUrlDropHeight: subUrlInputHeight * 2.5
-                    property real subUrlVerticalShift: ScreenTools.defaultFontPixelHeight * 0.5
-                    property real panelBottomPadding: ScreenTools.defaultFontPixelHeight * 0.75
-                    height: showPipAddPanel
-                            ? pipAddPanel.height + pipAddPanel.anchors.bottomMargin + pipButtonRow.height + pipButtonRow.anchors.bottomMargin
-                            : pipButtonRow.height + pipButtonRow.anchors.bottomMargin
-                    z: 900
 
-                    // 入力パネル背景（開いている間のみ表示）
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        visible: showPipAddPanel
-                        color: "#202020"
-                        border.color: "#4a4a4a"
-                        border.width: 1
-                        opacity: 0.9
-                        z: 0
-                    }
-
-                    Row {
-                        id: pipButtonRow
-                        property real buttonSizeScale: 0.55   // 少しだけ縮小
-                        property real buttonFontScale: 0.6    // テキストサイズは従来のまま
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 0.8
-                        anchors.rightMargin: ScreenTools.defaultFontPixelWidth * 4
-                        spacing: ScreenTools.defaultFontPixelWidth * 2.5
-
-                        QGCButton {
-                            id: pipConfirmButton
-                            text: qsTr("決定")
-                            width: ScreenTools.defaultFontPixelWidth * 16 * pipButtonRow.buttonSizeScale
-                            height: ScreenTools.defaultFontPixelHeight * 3.2 * pipButtonRow.buttonSizeScale
-                            font.pointSize: ScreenTools.mediumFontPointSize * pipButtonRow.buttonFontScale * 1.1
-                            visible: showPipAddPanel
-                            padding: 0
-                            contentItem: Text {
-                                text: pipConfirmButton.text
-                                anchors.centerIn: parent
-                                color: pipConfirmButton.enabled ? qgcPal.text : qgcPal.buttonDisabledText
-                                font: pipConfirmButton.font
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            onClicked: {
-                                if (_hasVideoHandler) {
-                                    videoHandler.subUrl = subUrlInput.text
-                                }
-                                showPipAddPanel = false
-                            }
-                        }
-
-                        QGCButton {
-                            id: pipAddButton
-                            text: qsTr("PiP追加")
-                            width: ScreenTools.defaultFontPixelWidth * 16 * pipButtonRow.buttonSizeScale
-                            height: ScreenTools.defaultFontPixelHeight * 3.2 * pipButtonRow.buttonSizeScale
-                            font.pointSize: ScreenTools.mediumFontPointSize * pipButtonRow.buttonFontScale * 1.1
-                            padding: 0
-                            contentItem: Text {
-                                text: pipAddButton.text
-                                anchors.centerIn: parent
-                                color: pipAddButton.enabled ? qgcPal.text : qgcPal.buttonDisabledText
-                                font: pipAddButton.font
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            onClicked: showPipAddPanel = !showPipAddPanel
-                        }
-                    }
-
-                    Rectangle {
-                        id: pipAddPanel
-                        visible: showPipAddPanel
-                        anchors.right: parent.right
-                        anchors.bottom: pipButtonRow.top
-                        anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 5 - pipAddContainer.subUrlDropHeight
-                        width: 320
-                        height: pipAddContent.implicitHeight + pipAddContent.anchors.topMargin + pipAddContainer.panelBottomPadding
-                        radius: 10
-                        color: "transparent"
-                        border.color: "transparent"
-                        z: 999
-                        onVisibleChanged: {
-                            if (!visible && _hasVideoHandler) {
-                                // パネルを閉じるタイミングでも保存
-                                videoHandler.subUrl = subUrlInput.text
-                            }
-                        }
-
-                        ColumnLayout {
-                            id: pipAddContent
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 14
-                            anchors.topMargin: pipAddContainer.subUrlVerticalShift + 14
-                            spacing: 8
-
-                            QGCLabel {
-                                text: qsTr("Sub URL")
-                                color: qgcPal.text
-                                Layout.fillWidth: true
-                            }
-                            TextField {
-                                id: subUrlInput
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: pipAddContainer.subUrlInputHeight
-                                text: _hasVideoHandler ? videoHandler.subUrl : ""
-                                placeholderText: qsTr("rtsp://...")
-                                color: qgcPal.text
-                                onAccepted: {
-                                    if (_hasVideoHandler) {
-                                        videoHandler.subUrl = text
-                                    }
-                                }
-                                onEditingFinished: {
-                                    if (_hasVideoHandler) {
-                                        videoHandler.subUrl = text
-                                    }
-                                }
-                                background: Rectangle {
-                                    radius: 6
-                                    color: "#222222"
-                                    border.color: "#555555"
-                                }
-                            }
-
-                            // 決定ボタンとの間隔を確保
-                            Item { Layout.fillWidth: true; Layout.preferredHeight: ScreenTools.defaultFontPixelHeight }
-
-                            // 下側に少し余白を確保（背景の縦サイズを抑えつつタップ余白を確保）
-                            Item { Layout.fillWidth: true; Layout.preferredHeight: ScreenTools.defaultFontPixelHeight * 1.25 }
-                        }
-                    }
-                }
 
             }
         }

@@ -9,8 +9,14 @@
 #include <QtCore/QObject>
 #include <QtCore/QSettings>
 #include <QtCore/QTimer>
+#ifdef Q_OS_ANDROID
+#include <QtCore/QJniObject>
+#endif
 
 #include "LinkInterface.h"
+#include "PhotoCaptureFeedback.h"
+
+class MavlinkCameraControl;
 #include "QVIOHandler.h"
 #include "ToFHandler.h"
 #include "Vehicle.h"
@@ -19,6 +25,7 @@
 class CustomQGCApplication : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(PhotoCaptureFeedback *photoFeedback READ photoFeedback CONSTANT)
     Q_PROPERTY(double vioQuality READ vioQuality NOTIFY vioChanged)
     Q_PROPERTY(QString vioStatus READ vioStatus NOTIFY vioChanged)
     Q_PROPERTY(QVIOHandler *qvioHandler READ qvioHandler CONSTANT)
@@ -29,6 +36,11 @@ class CustomQGCApplication : public QObject
 
 public:
     explicit CustomQGCApplication(QObject *parent = nullptr);
+    ~CustomQGCApplication() override;
+    Q_INVOKABLE void playShutterSound();
+
+    PhotoCaptureFeedback *photoFeedback() { return &_photoFeedback; }
+    Q_INVOKABLE bool takePhoto(MavlinkCameraControl *camera);
 
     double vioQuality() const { return _qvioHandler.quality(); }
     QString vioStatus() const { return _qvioHandler.stateLabel(); }
@@ -65,6 +77,10 @@ private:
     void _setStatusOverlayMessage(const QString &message);
     void _clearStatusOverlay();
 
+    PhotoCaptureFeedback _photoFeedback;
+#ifdef Q_OS_ANDROID
+    QJniObject _shutterSound;
+#endif
     Vehicle *_vehicle = nullptr;
     VideoHandler *_videoHandler = nullptr;
     QVIOHandler _qvioHandler;
