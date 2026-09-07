@@ -4660,6 +4660,22 @@ void Vehicle::_textMessageReceived(MAV_COMPONENT componentid, MAV_SEVERITY sever
         readAloud = true;
     }
 
+#ifdef QGC_CUSTOM_BUILD
+    // W-510 clears the custom ESC overheat overlay without announcing recovery.
+    // Keep delivering the message below so the overlay and message log update.
+    QString statusText = text.trimmed();
+    if (statusText.startsWith(QStringLiteral("<W-510>"))) {
+        statusText = statusText.mid(7).trimmed();
+    } else if (statusText.startsWith(QStringLiteral("W-510"))) {
+        statusText = statusText.mid(5).trimmed();
+    } else {
+        statusText.clear();
+    }
+    if (statusText == QStringLiteral("ESC High Temperature")) {
+        skipSpoken = true;
+    }
+#endif
+
     if (readAloud && !skipSpoken) {
         _say(text);
     }
