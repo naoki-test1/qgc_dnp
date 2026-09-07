@@ -2259,7 +2259,7 @@ void Vehicle::virtualTabletJoystickValue(double roll, double pitch, double yaw, 
 
 void Vehicle::_say(const QString& text)
 {
-    AudioOutput::instance()->say(text.toLower());
+    AudioOutput::instance()->say(text);
 }
 
 bool Vehicle::airship() const
@@ -4660,24 +4660,23 @@ void Vehicle::_textMessageReceived(MAV_COMPONENT componentid, MAV_SEVERITY sever
         readAloud = true;
     }
 
+    QString spokenText = text;
 #ifdef QGC_CUSTOM_BUILD
-    // W-510 clears the custom ESC overheat overlay without announcing recovery.
-    // Keep delivering the message below so the overlay and message log update.
-    QString statusText = text.trimmed();
-    if (statusText.startsWith(QStringLiteral("<W-510>"))) {
-        statusText = statusText.mid(7).trimmed();
-    } else if (statusText.startsWith(QStringLiteral("W-510"))) {
-        statusText = statusText.mid(5).trimmed();
-    } else {
-        statusText.clear();
+    const QString statusKey = CustomQGCApplication::statusMessageKey(text);
+    if (statusKey == QStringLiteral("C-510|ESC Overheat")) {
+        _escOverheatElapsedTimer.start();
+    } else if (statusKey.startsWith(QStringLiteral("W-510|"))
+               && _escOverheatElapsedTimer.isValid()
+               && _escOverheatElapsedTimer.elapsed() < 60000) {
+        // Ignore recovery for one minute after the latest overheat message.
+        // Each vehicle has its own monotonic timer; do not queue early recovery.
+        return;
     }
-    if (statusText == QStringLiteral("ESC High Temperature")) {
-        skipSpoken = true;
-    }
+    spokenText = CustomQGCApplication::statusSpeechText(text);
 #endif
 
-    if (readAloud && !skipSpoken) {
-        _say(text);
+    if (readAloud && !skipSpoken && !spokenText.isEmpty()) {
+        _say(spokenText);
     }
 
     emit textMessageReceived(id(), componentid, severity, text, description);

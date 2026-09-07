@@ -164,7 +164,31 @@ void CustomQGCApplication::_handleTextMessage(int sysid, int componentid, int se
     }
 }
 
-bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey) const
+QString CustomQGCApplication::statusMessageKey(const QString &text)
+{
+    QString displayMessage;
+    QString messageKey;
+    bool persistent = false;
+    _parseStatusOverlayMessage(text, displayMessage, persistent, messageKey);
+    return messageKey;
+}
+
+QString CustomQGCApplication::statusSpeechText(const QString &text)
+{
+    QString displayMessage;
+    QString messageKey;
+    bool persistent = false;
+    if (!_parseStatusOverlayMessage(text, displayMessage, persistent, messageKey)) {
+        return text;
+    }
+    if (messageKey == QStringLiteral("W-510|ESC High Temperature")) {
+        return QString();
+    }
+    // Use exactly the overlay wording, without its decorative warning symbol.
+    return cleanedStatusText(displayMessage);
+}
+
+bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey)
 {
     static const QRegularExpression codeExpression(QStringLiteral("^<([CEWID])-([0-9]{3})>\\s*(.*)$|^([CEWID])-([0-9]{3})\\b\\s*(.*)$"));
     static const QHash<QString, QString> exactMessages {
@@ -203,7 +227,7 @@ bool CustomQGCApplication::_parseStatusOverlayMessage(const QString &text, QStri
     return true;
 }
 
-QString CustomQGCApplication::_translatedStatusText(const QString &code, QChar level, int genre) const
+QString CustomQGCApplication::_translatedStatusText(const QString &code, QChar level, int genre)
 {
     static const QHash<QString, QString> exactMessages {
         { QStringLiteral("E-301"), QStringLiteral("MPA / Pipe / Dataでエラーが発生しました。アームしないでください。") },

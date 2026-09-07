@@ -14,6 +14,8 @@
 #include <QtCore/QRegularExpression>
 #include <QtCore/qapplicationstatic.h>
 #include <QtTextToSpeech/QTextToSpeech>
+#include <QtCore/QThread>
+#include <algorithm>
 
 QGC_LOGGING_CATEGORY(AudioOutputLog, "qgc.audio.audiooutput");
 // qt.speech.tts.flite
@@ -78,18 +80,28 @@ void AudioOutput::init(Fact *mutedFact)
         return;
     }
 
-    (void) connect(_engine, &QTextToSpeech::engineChanged, this, [this](const QString &engine) {
-        qCDebug(AudioOutputLog) << "TTS Engine set to:" << engine;
-        const QLocale defaultLocale = QLocale("en_US");
-        if (_engine->availableLocales().contains(defaultLocale)) {
-            _engine->setLocale(defaultLocale);
-        }
-    });
-
     (void) connect(_engine, &QTextToSpeech::aboutToSynthesize, this, [this](qsizetype id) {
-        qCDebug(AudioOutputLog) << "TTS About To Synthesize ID:" << id;
-        _textQueueSize--;
-        qCDebug(AudioOutputLog) << "Queue Size:" << _textQueueSize;
+        Q_UNUSED(id)
+        if (_queuedLocales.isEmpty()) {
+            return;
+        }
+        const QLocale requested = _queuedLocales.dequeue();
+        const auto locales = _engine->availableLocales();
+        QLocale selected = requested;
+        if (!locales.contains(selected)) {
+            const auto match = std::find_if(locales.cbegin(), locales.cend(), [&requested](const QLocale &locale) {
+                return locale.language() == requested.language();
+            });
+            if (match == locales.cend()) {
+                qCWarning(AudioOutputLog) << "Speech language unavailable:" << requested;
+                return;
+            }
+            selected = *match;
+        }
+        // Select the language when this utterance starts, not while another is speaking.
+        if (_engine->locale() != selected) {
+            _engine->setLocale(selected);
+        }
     });
 
     (void) connect(mutedFact, &Fact::valueChanged, this, [this](QVariant value) {
@@ -130,6 +142,11 @@ void AudioOutput::setMuted(bool muted)
 
 void AudioOutput::say(const QString &text, TextMods textMods)
 {
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, [this, text, textMods]() { say(text, textMods); }, Qt::QueuedConnection);
+        return;
+    }
+
     if (!_initialized) {
         qCWarning(AudioOutputLog) << "AudioOutput not initialized. Call init() before using say().";
         return;
@@ -144,27 +161,54 @@ void AudioOutput::say(const QString &text, TextMods textMods)
         return;
     }
 
-    if (_textQueueSize >= kMaxTextQueueSize) {
-        (void) QMetaObject::invokeMethod(_engine, "stop", Qt::AutoConnection, QTextToSpeech::BoundaryHint::Default);
-        _textQueueSize = 0;
-        qCWarning(AudioOutputLog) << "Text queue exceeded maximum size. Stopped current speech.";
-    }
-
-    QString outText = _fixTextMessageForAudio(text);
+    QString outText = text;
 
     if (textMods.testFlag(TextMod::Translate)) {
         outText = tr("%1").arg(outText);
     }
 
-    qsizetype index;
-    if (QMetaObject::invokeMethod(_engine, "enqueue", Qt::AutoConnection, qReturnArg(index), outText)) {
-        if (index != -1) {
-            _textQueueSize++;
-            qCDebug(AudioOutputLog) << "Enqueued text with index:" << index << ", Queue Size:" << _textQueueSize;
-        }
-    } else {
-        qCWarning(AudioOutputLog) << "Failed to invoke Enqueue method.";
+    outText = _removeBracketedText(outText);
+    if (outText.isEmpty()) {
+        return;
     }
+    const QLocale locale = _speechLocaleForText(outText);
+    // English pronunciation substitutions would corrupt Japanese alert text.
+    if (locale.language() == QLocale::English) {
+        outText = _fixTextMessageForAudio(outText);
+    }
+    if (_queuedLocales.size() >= kMaxTextQueueSize) {
+        (void) QMetaObject::invokeMethod(_engine, "stop", Qt::AutoConnection, QTextToSpeech::BoundaryHint::Default);
+        _queuedLocales.clear();
+        qCWarning(AudioOutputLog) << "Text queue exceeded maximum size. Stopped current speech.";
+    }
+
+    const qsizetype pendingBefore = _queuedLocales.size();
+    _queuedLocales.enqueue(locale);
+    // enqueue() can emit aboutToSynthesize synchronously for the first utterance.
+    const qsizetype index = _engine->enqueue(outText);
+    if (index == -1 && _queuedLocales.size() > pendingBefore) {
+        _queuedLocales.removeLast();
+        qCWarning(AudioOutputLog) << "Failed to enqueue speech.";
+    }
+}
+
+QString AudioOutput::_removeBracketedText(const QString &text)
+{
+    static const QRegularExpression bracketedText(QStringLiteral("<[^>]*>"));
+    QString result = text;
+    result.replace(bracketedText, QStringLiteral(" "));
+    return result.simplified();
+}
+
+QLocale AudioOutput::_speechLocaleForText(const QString &text)
+{
+    for (const QChar character : text) {
+        const auto script = character.script();
+        if (script == QChar::Script_Hiragana || script == QChar::Script_Katakana || script == QChar::Script_Han) {
+            return QLocale(QLocale::Japanese, QLocale::Japan);
+        }
+    }
+    return QLocale(QLocale::English, QLocale::UnitedStates);
 }
 
 QString AudioOutput::_fixTextMessageForAudio(const QString &string)

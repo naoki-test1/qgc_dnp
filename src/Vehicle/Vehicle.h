@@ -1080,6 +1080,9 @@ private:
     static const int _recStatTelemetryTimeoutMsecs = 3000;
     int             _recStatRecordingElapsedSeconds = 0;
     QElapsedTimer   _recStatRecordingElapsedTimer;
+#ifdef QGC_CUSTOM_BUILD
+    QElapsedTimer   _escOverheatElapsedTimer;
+#endif
     QTimer          _recStatRecordingElapsedUpdateTimer;
     float           _cpuTempCelsius = 0.f;
     bool            _cpuTempAvailable = false;

@@ -36,6 +36,8 @@ public:
     ToFHandler *tofHandler() { return &_tofHandler; }
     VideoHandler *videoHandler() const { return _videoHandler; }
     QString statusOverlayMessage() const { return _statusOverlayMessage; }
+    static QString statusSpeechText(const QString &text);
+    static QString statusMessageKey(const QString &text);
     bool statusOverlayVisible() const { return !_statusOverlayMessage.isEmpty(); }
 
 public slots:
@@ -58,8 +60,8 @@ private slots:
     void _handleTransientStatusOverlayTimeout();
 
 private:
-    bool _parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey) const;
-    QString _translatedStatusText(const QString &code, QChar level, int genre) const;
+    static bool _parseStatusOverlayMessage(const QString &text, QString &displayMessage, bool &persistent, QString &messageKey);
+    static QString _translatedStatusText(const QString &code, QChar level, int genre);
     void _setStatusOverlayMessage(const QString &message);
     void _clearStatusOverlay();
 

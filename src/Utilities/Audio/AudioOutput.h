@@ -11,6 +11,8 @@
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
+#include <QtCore/QLocale>
+#include <QtCore/QQueue>
 
 class QTextToSpeech;
 class Fact;
@@ -63,7 +65,7 @@ public:
 
 private:
     QTextToSpeech *_engine = nullptr;
-    QAtomicInteger<qsizetype> _textQueueSize = 0;
+    QQueue<QLocale> _queuedLocales;
     bool _initialized = false;
     std::atomic_bool _muted = false;
 
@@ -74,6 +76,9 @@ private:
     /// Fixes text messages for audio output.
     ///     @param string The text message to fix.
     ///     @return The fixed text message.
+    static QLocale _speechLocaleForText(const QString &text);
+    static QString _removeBracketedText(const QString &text);
+
     static QString _fixTextMessageForAudio(const QString &string);
 
     /// Replaces predefined abbreviations with their corresponding full forms.

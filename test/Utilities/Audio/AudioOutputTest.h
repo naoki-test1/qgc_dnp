@@ -17,4 +17,6 @@ class AudioOutputTest : public UnitTest
 
 private slots:
     void _testSpokenReplacements();
+    void _testSpeechLocales();
+    void _testBracketedText();
 };
