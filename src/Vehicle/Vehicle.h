@@ -1082,6 +1082,7 @@ private:
     QElapsedTimer   _recStatRecordingElapsedTimer;
 #ifdef QGC_CUSTOM_BUILD
     QElapsedTimer   _escOverheatElapsedTimer;
+    QElapsedTimer   _escRecoveryElapsedTimer;
 #endif
     QTimer          _recStatRecordingElapsedUpdateTimer;
     float           _cpuTempCelsius = 0.f;

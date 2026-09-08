@@ -57,12 +57,49 @@ Rectangle {
             anchors.fill: parent
             color: "#66000000"
         }
-        BusyIndicator {
+        Rectangle {
+            id: savingIndicator
             anchors.centerIn: parent
-            width: ScreenTools.defaultFontPixelHeight * 2.8
+            width: ScreenTools.defaultFontPixelHeight * 3.2
             height: width
-            running: root.captureState === "saving"
-            visible: running
+            radius: width / 2
+            color: "#f5101820"
+            border.color: "#88ffffff"
+            border.width: 1
+            visible: root.captureState === "saving"
+
+            Item {
+                id: loadingRing
+                anchors.fill: parent
+                anchors.margins: parent.width * 0.14
+
+                Repeater {
+                    model: 12
+                    Item {
+                        required property int index
+                        anchors.fill: parent
+                        rotation: index * 30
+                        opacity: 0.45 + index / 11 * 0.55
+
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: parent.top
+                            width: loadingRing.width * 0.14
+                            height: width
+                            radius: width / 2
+                            color: "#ffffff"
+                        }
+                    }
+                }
+
+                RotationAnimation on rotation {
+                    from: 0
+                    to: 360
+                    duration: 1000
+                    loops: Animation.Infinite
+                    running: savingIndicator.visible && root.visible
+                }
+            }
         }
         Label {
             anchors.centerIn: parent

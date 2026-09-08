@@ -2,7 +2,23 @@
 
 > **Note:** This file only contains high‑level features or important fixes.
 
-## [v5.0.0-1.0.2] – 2026-09-07
+## [v5.0.0-1.1.3] – 2026-09-08
+
+- **Settings lock**: Restore the distribution admin lock. Hold the QGC logo for 8 seconds, then enter the existing admin PIN to open the tools menu. Hold progress appears after 5 seconds. Admin access expires after one hour and can be locked manually in General Settings.
+- **ESC overheat**: The first C-510 starts a 10-second hold that discards both C-510 duplicates and W-510 recovery. Further C-510 messages remain ignored until an accepted W-510 clears the alert; duplicates do not restart the hold. A new C-510 can then start another cycle.
+- **ESC recovery**: Each accepted W-510 starts a separate 10-second cooldown for W-510 only. A new C-510 remains eligible during this cooldown. Ignored messages do not extend either timer; early recovery is not queued.
+- **Photo feedback**: Use a brighter rotating white loading ring with a dark background while saving.
+- **Android**: Version `5.0.0-1.1.3`, ARM64, signed with the existing certificate.
+
+## [v5.0.0-1.1.2] – 2026-09-08
+
+Renumbered the original `v5.0.0-1.0.2` release, preserving its behavior. Updated APK and embedded application versions, filenames, release tags, and checksums.
+
+## [v5.0.0-1.1.1] – 2026-09-08
+
+Renumbered the original `v5.0.0-1.0.1` release, preserving its behavior. Updated APK and embedded application versions, filenames, release tags, and checksums.
+
+## [v5.0.0-1.0.2] – 2026-09-07 (now v5.0.0-1.1.2)
 
 - **Shutter feedback**: Play the Android device's native shutter sound when the photo button is clicked.
 - **Photo preview**: Show a thumbnail with saving, saved, failed, or unconfirmed status.

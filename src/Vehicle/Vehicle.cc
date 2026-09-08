@@ -4664,13 +4664,25 @@ void Vehicle::_textMessageReceived(MAV_COMPONENT componentid, MAV_SEVERITY sever
 #ifdef QGC_CUSTOM_BUILD
     const QString statusKey = CustomQGCApplication::statusMessageKey(text);
     if (statusKey == QStringLiteral("C-510|ESC Overheat")) {
+        // Keep the current alert until recovery; duplicates must not restart the hold.
+        if (_escOverheatElapsedTimer.isValid()) {
+            return;
+        }
         _escOverheatElapsedTimer.start();
-    } else if (statusKey.startsWith(QStringLiteral("W-510|"))
-               && _escOverheatElapsedTimer.isValid()
-               && _escOverheatElapsedTimer.elapsed() < 60000) {
-        // Ignore recovery for one minute after the latest overheat message.
-        // Each vehicle has its own monotonic timer; do not queue early recovery.
-        return;
+    } else if (statusKey == QStringLiteral("W-510|ESC High Temperature")) {
+        // Recovery cooldown suppresses only W-510, never a new C-510.
+        if (_escRecoveryElapsedTimer.isValid()
+            && _escRecoveryElapsedTimer.elapsed() < 10000) {
+            return;
+        }
+        // Discard early recovery without queuing it or extending the hold.
+        if (_escOverheatElapsedTimer.isValid()
+            && _escOverheatElapsedTimer.elapsed() < 10000) {
+            return;
+        }
+        // This recovery clears the overlay and allows a new overheat cycle.
+        _escOverheatElapsedTimer.invalidate();
+        _escRecoveryElapsedTimer.start();
     }
     spokenText = CustomQGCApplication::statusSpeechText(text);
 #endif
