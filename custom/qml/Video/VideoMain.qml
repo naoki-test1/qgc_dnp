@@ -14,17 +14,6 @@ Item {
     readonly property bool _displaySwapped: _hasHandler ? videoHandler.displaySwapped : false
     readonly property bool _streaming: _hasHandler ? (_displaySwapped ? videoHandler.subStreaming : videoHandler.mainStreaming) : false
     readonly property bool _hasUrl: url && url.length > 0
-    readonly property int _retryDelayMinMs: 10000
-    readonly property int _retryDelayMaxMs: 30000
-    property int _retryDelayMs: _retryDelayMinMs
-
-    on_StreamingChanged: {
-        if (_streaming) {
-            _retryDelayMs = _retryDelayMinMs
-        }
-    }
-
-    on_HasUrlChanged: _retryDelayMs = _retryDelayMinMs
 
     FlightDisplayViewGStreamer {
         id: videoSurface
@@ -158,7 +147,7 @@ Item {
 
     // ストリームが落ちている場合の再起動リトライ
     Timer {
-        interval: root._retryDelayMs
+        interval: 3000
         running: _hasHandler && _hasUrl && !_streaming
         repeat: true
         onTriggered: {
@@ -169,7 +158,6 @@ Item {
                     videoHandler.restartMainStream()
                 }
             }
-            root._retryDelayMs = Math.min(root._retryDelayMaxMs, root._retryDelayMs * 2)
         }
     }
 
