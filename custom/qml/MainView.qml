@@ -949,44 +949,21 @@ ApplicationWindow {
                         readonly property real cameraIconOffsetY: 0
                         readonly property real cameraControlExtraWidth: Screen.pixelDensity * 6
                         readonly property real cameraControlExtraHeight: Screen.pixelDensity * 2.5
-                        readonly property string brakeParamName: "CP_DIST"
-                        readonly property bool brakeParamControllerActive: !!activeVehicle && activeVehicle.parameterManager && activeVehicle.parameterManager.parametersReady
-                        readonly property var brakeParamController: brakeParamControllerLoader.item ? brakeParamControllerLoader.item.controller : null
-                        property Fact brakeParamFact: brakeParamController && brakeParamController.parameterExists(-1, brakeParamName) ? brakeParamController.getParameterFact(-1, brakeParamName, false) : null
-                        readonly property bool brakeParamAvailable: brakeParamFact !== null
-                        readonly property bool brakeEnabled: brakeParamAvailable && Number(brakeParamFact.rawValue) >= 0
-                        readonly property color brakeActiveBackground: "#f5c84c"
-                        readonly property color brakeInactiveBackground: Qt.rgba(0.34, 0.34, 0.34, 0.88)
-                        readonly property color brakeActiveTextColor: "#1f1f1f"
-                        readonly property color brakeInactiveTextColor: Qt.rgba(255, 255, 255, 0.48)
-                        readonly property real brakeMinimumWidth: ScreenTools.defaultFontPixelWidth * 14.4
-                        readonly property real brakeInnerMargin: ScreenTools.defaultFontPixelHeight * 0.34
-                        readonly property real brakeLabelWidth: ScreenTools.defaultFontPixelWidth * 3.5
+                        readonly property color toggleActiveBackground: "#f5c84c"
+                        readonly property color toggleInactiveBackground: Qt.rgba(0.34, 0.34, 0.34, 0.88)
+                        readonly property color toggleActiveTextColor: "#1f1f1f"
+                        readonly property color toggleInactiveTextColor: Qt.rgba(255, 255, 255, 0.48)
+                        readonly property real toggleInnerMargin: ScreenTools.defaultFontPixelHeight * 0.34
+                        readonly property real toggleSegmentsMinimumWidth: ScreenTools.defaultFontPixelWidth * 9
                         readonly property real badgeWidth: Math.max(
                             storageLabel.implicitWidth + badgeHorizontalPadding * 2 + ScreenTools.defaultFontPixelWidth * 0.3,
                             recStatusRow.implicitWidth + badgeHorizontalPadding * 2,
                             cameraControlRow.implicitWidth + badgeHorizontalPadding * 2 + cameraControlExtraWidth,
-                            brakeMinimumWidth
+                            rthStatusLabel.implicitWidth + badgeHorizontalPadding + ScreenTools.defaultFontPixelWidth * 0.75 + toggleSegmentsMinimumWidth + toggleInnerMargin
                         )
                         visible: !!activeCamera
                         width: badgeWidth
                         height: badgeStack.implicitHeight
-
-                        Loader {
-                            id: brakeParamControllerLoader
-                            active: cameraStorageBadge.brakeParamControllerActive
-                            sourceComponent: brakeParamControllerComponent
-                        }
-
-                        Component {
-                            id: brakeParamControllerComponent
-
-                            Item {
-                                property alias controller: brakeParamController
-
-                                FactPanelController { id: brakeParamController }
-                            }
-                        }
 
                         Column {
                             id: badgeStack
@@ -1173,60 +1150,65 @@ ApplicationWindow {
                                 }
                             }
 
+                            // Return-to-home toggle (UI only; not yet sent to voxl-vision-hub)
                             Rectangle {
-                                id: brakeStatusBackground
+                                id: rthStatusBackground
                                 width: cameraStorageBadge.badgeWidth
                                 radius: ScreenTools.defaultFontPixelHeight * 0.45
                                 color: Qt.rgba(0, 0, 0, 0.42)
                                 border.width: 1
                                 border.color: Qt.rgba(255, 255, 255, 0.28)
-                                visible: cameraControlBackground.visible
+                                visible: cameraControlBackground.visible && typeof customApp !== "undefined"
                                 implicitHeight: storageLabel.implicitHeight + ScreenTools.defaultFontPixelHeight * 0.55
+                                readonly property bool rthEnabled: typeof customApp !== "undefined" && customApp.returnToHomeEnabled
 
                                 QGCLabel {
-                                    id: brakeStatusLabel
+                                    id: rthStatusLabel
                                     anchors.left: parent.left
                                     anchors.leftMargin: cameraStorageBadge.badgeHorizontalPadding
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: cameraStorageBadge.brakeLabelWidth
-                                    text: qsTr("BRK")
+                                    text: qsTr("自動帰還")
                                     color: qgcPal.text
                                     font.pixelSize: ScreenTools.defaultFontPixelHeight * 0.68
                                     font.bold: true
                                 }
 
                                 Item {
-                                    id: brakeSegments
-                                    anchors.left: brakeStatusLabel.right
+                                    id: rthSegments
+                                    anchors.left: rthStatusLabel.right
                                     anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.75
                                     anchors.right: parent.right
-                                    anchors.rightMargin: cameraStorageBadge.brakeInnerMargin
+                                    anchors.rightMargin: cameraStorageBadge.toggleInnerMargin
                                     anchors.top: parent.top
-                                    anchors.topMargin: cameraStorageBadge.brakeInnerMargin
+                                    anchors.topMargin: cameraStorageBadge.toggleInnerMargin
                                     anchors.bottom: parent.bottom
-                                    anchors.bottomMargin: cameraStorageBadge.brakeInnerMargin
+                                    anchors.bottomMargin: cameraStorageBadge.toggleInnerMargin
 
                                     Rectangle {
-                                        id: brakeOnSegment
+                                        id: rthOnSegment
                                         anchors.left: parent.left
                                         anchors.right: parent.horizontalCenter
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        readonly property bool selected: cameraStorageBadge.brakeParamAvailable && cameraStorageBadge.brakeEnabled
+                                        readonly property bool selected: rthStatusBackground.rthEnabled
                                         radius: ScreenTools.defaultFontPixelHeight * 0.2
-                                        color: selected ? cameraStorageBadge.brakeActiveBackground : cameraStorageBadge.brakeInactiveBackground
+                                        color: selected ? cameraStorageBadge.toggleActiveBackground : cameraStorageBadge.toggleInactiveBackground
 
                                         QGCLabel {
                                             anchors.centerIn: parent
                                             text: qsTr("ON")
-                                            color: brakeOnSegment.selected ? cameraStorageBadge.brakeActiveTextColor : cameraStorageBadge.brakeInactiveTextColor
+                                            color: rthOnSegment.selected ? cameraStorageBadge.toggleActiveTextColor : cameraStorageBadge.toggleInactiveTextColor
                                             font.pixelSize: ScreenTools.defaultFontPixelHeight * 0.64
-                                            font.bold: brakeOnSegment.selected
+                                            font.bold: rthOnSegment.selected
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: customApp.returnToHomeEnabled = true
                                         }
                                     }
 
                                     QGCLabel {
-                                        id: brakeSeparator
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: qsTr("｜")
@@ -1237,21 +1219,26 @@ ApplicationWindow {
                                     }
 
                                     Rectangle {
-                                        id: brakeOffSegment
+                                        id: rthOffSegment
                                         anchors.left: parent.horizontalCenter
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        readonly property bool selected: cameraStorageBadge.brakeParamAvailable && !cameraStorageBadge.brakeEnabled
+                                        readonly property bool selected: !rthStatusBackground.rthEnabled
                                         radius: ScreenTools.defaultFontPixelHeight * 0.2
-                                        color: selected ? cameraStorageBadge.brakeActiveBackground : cameraStorageBadge.brakeInactiveBackground
+                                        color: selected ? cameraStorageBadge.toggleActiveBackground : cameraStorageBadge.toggleInactiveBackground
 
                                         QGCLabel {
                                             anchors.centerIn: parent
                                             text: qsTr("OFF")
-                                            color: brakeOffSegment.selected ? cameraStorageBadge.brakeActiveTextColor : cameraStorageBadge.brakeInactiveTextColor
+                                            color: rthOffSegment.selected ? cameraStorageBadge.toggleActiveTextColor : cameraStorageBadge.toggleInactiveTextColor
                                             font.pixelSize: ScreenTools.defaultFontPixelHeight * 0.64
-                                            font.bold: brakeOffSegment.selected
+                                            font.bold: rthOffSegment.selected
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: customApp.returnToHomeEnabled = false
                                         }
                                     }
                                 }

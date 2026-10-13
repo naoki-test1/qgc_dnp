@@ -33,6 +33,7 @@ class CustomQGCApplication : public QObject
     Q_PROPERTY(VideoHandler *videoHandler READ videoHandler CONSTANT)
     Q_PROPERTY(QString statusOverlayMessage READ statusOverlayMessage NOTIFY statusOverlayChanged)
     Q_PROPERTY(bool statusOverlayVisible READ statusOverlayVisible NOTIFY statusOverlayChanged)
+    Q_PROPERTY(bool returnToHomeEnabled READ returnToHomeEnabled WRITE setReturnToHomeEnabled NOTIFY returnToHomeEnabledChanged)
 
 public:
     explicit CustomQGCApplication(QObject *parent = nullptr);
@@ -51,6 +52,9 @@ public:
     static QString statusSpeechText(const QString &text);
     static QString statusMessageKey(const QString &text);
     bool statusOverlayVisible() const { return !_statusOverlayMessage.isEmpty(); }
+    // UI only for now: not yet sent to voxl-vision-hub
+    bool returnToHomeEnabled() const { return _returnToHomeEnabled; }
+    void setReturnToHomeEnabled(bool enabled);
 
 public slots:
     void recordStart();
@@ -61,6 +65,7 @@ public slots:
 signals:
     void vioChanged();
     void statusOverlayChanged();
+    void returnToHomeEnabledChanged();
 
 private slots:
     void _activeVehicleChanged(Vehicle *vehicle);
@@ -90,4 +95,5 @@ private:
     QString _persistentStatusOverlayMessage;
     QString _persistentStatusOverlayKey;
     QTimer _statusOverlayTimer;
+    bool _returnToHomeEnabled = true;
 };

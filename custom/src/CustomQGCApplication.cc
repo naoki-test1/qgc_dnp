@@ -146,6 +146,17 @@ void CustomQGCApplication::swapCamera()
     }
 }
 
+void CustomQGCApplication::setReturnToHomeEnabled(bool enabled)
+{
+    if (_returnToHomeEnabled == enabled) {
+        return;
+    }
+
+    _returnToHomeEnabled = enabled;
+    qCDebug(CustomAppLog) << "Return to home" << (enabled ? "enabled" : "disabled") << "(UI only)";
+    emit returnToHomeEnabledChanged();
+}
+
 void CustomQGCApplication::_activeVehicleChanged(Vehicle *vehicle)
 {
     if (_vehicle) {

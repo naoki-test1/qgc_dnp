@@ -1,0 +1,133 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'apk/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      QT_VERSION: 6.8.3
+      QT_MODULES: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors qtscxml
+      ANDROID_ABI: arm64-v8a
+      BUILD_TOOLS: 35.0.0
+      APK_NAME: QGroundControl-sd-crawl.apk
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Initial Setup
+        uses: ./.github/actions/common
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26b
+          add-to-path: false
+
+      - run: echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
+
+      - name: Install Qt (host)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          dir: ${{ runner.temp }}
+          modules: ${{ env.QT_MODULES }}
+          setup-python: false
+          cache: true
+
+      - run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Install Qt (Android arm64)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+          dir: ${{ runner.temp }}
+          modules: ${{ env.QT_MODULES }}
+          setup-python: false
+          cache: true
+
+      - name: Configure
+        working-directory: ${{ runner.temp }}/shadow_build_dir
+        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -DCMAKE_WARN_DEPRECATED=FALSE
+              -DQT_HOST_PATH="${{ env.QT_HOST_PATH }}"
+              -DQT_ANDROID_ABIS="${{ env.ANDROID_ABI }}"
+              -DQT_ANDROID_BUILD_ALL_ABIS=OFF
+              -DANDROID_ABI="${{ env.ANDROID_ABI }}"
+              -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+              -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+              -DQT_ANDROID_SIGN_APK=OFF
+
+      - name: Build
+        working-directory: ${{ runner.temp }}/shadow_build_dir
+        run: |
+          cmake --build . --target all
+          cmake --build . --target apk
+
+      # Signs with the keystore in secrets when ANDROID_KEYSTORE_BASE64 is set,
+      # otherwise with a throwaway key (uninstall the previous app before installing).
+      - name: Sign APK
+        working-directory: ${{ runner.temp }}/shadow_build_dir
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+        run: |
+          APK_IN=$(find . -name '*.apk' -path '*outputs/apk*' | head -1)
+          [ -n "$APK_IN" ] || APK_IN=$(find . -name '*.apk' | head -1)
+          echo "Unsigned APK: $APK_IN"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set; signing with a throwaway key"
+            KEYSTORE_PASSWORD=android
+            KEYSTORE_ALIAS=qgc
+            keytool -genkeypair -keystore release.keystore -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+              -alias "$KEYSTORE_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=QGC sd-crawl CI"
+          fi
+          BT="$ANDROID_SDK_ROOT/build-tools/${{ env.BUILD_TOOLS }}"
+          "$BT/zipalign" -f -p 4 "$APK_IN" aligned.apk
+          "$BT/apksigner" sign --ks release.keystore --ks-pass "pass:$KEYSTORE_PASSWORD" --ks-key-alias "$KEYSTORE_ALIAS" \
+            --out "${{ env.APK_NAME }}" aligned.apk
+          "$BT/apksigner" verify --print-certs "${{ env.APK_NAME }}"
+          rm -f release.keystore
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: QGroundControl-sd-crawl-apk
+          path: ${{ runner.temp }}/shadow_build_dir/${{ env.APK_NAME }}
+          if-no-files-found: error
