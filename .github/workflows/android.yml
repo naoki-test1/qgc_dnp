@@ -52,33 +52,26 @@ jobs:
 
       - run: echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
 
-      - name: Install Qt (host)
-        uses: jurplel/install-qt-action@v4
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
         with:
-          version: ${{ env.QT_VERSION }}
-          host: linux
-          target: desktop
-          arch: linux_gcc_64
-          dir: ${{ runner.temp }}
-          modules: ${{ env.QT_MODULES }}
-          setup-python: false
-          aqtversion: '==3.3.*'
-          cache: true
+          path: ${{ runner.temp }}/Qt
+          key: qt-${{ env.QT_VERSION }}-linux-android-arm64-${{ hashFiles('.github/workflows/android.yml') }}
 
-      - run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+      # install-qt-action fails to resolve 6.8.3 ("No available Qt version found"), so call aqt directly
+      - name: Install Qt (host + Android arm64)
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          python3 -m pip install "aqtinstall==3.3.0"
+          aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 -O "$RUNNER_TEMP/Qt" -m ${{ env.QT_MODULES }}
+          aqt install-qt linux android ${{ env.QT_VERSION }} android_arm64_v8a -O "$RUNNER_TEMP/Qt" -m ${{ env.QT_MODULES }}
 
-      - name: Install Qt (Android arm64)
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          host: linux
-          target: android
-          arch: android_arm64_v8a
-          dir: ${{ runner.temp }}
-          modules: ${{ env.QT_MODULES }}
-          setup-python: false
-          aqtversion: '==3.3.*'
-          cache: true
+      - name: Set Qt paths
+        run: |
+          echo "QT_HOST_PATH=$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}/gcc_64" >> "$GITHUB_ENV"
+          echo "QT_ROOT_DIR=$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}/android_arm64_v8a" >> "$GITHUB_ENV"
+          ls "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}"
 
       - name: Configure
         working-directory: ${{ runner.temp }}/shadow_build_dir
