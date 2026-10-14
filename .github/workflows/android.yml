@@ -6,6 +6,9 @@ on:
     branches:
       - 'apk/**'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -71,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/Qt
-          key: qt-${{ env.QT_VERSION }}-linux-android-arm64-${{ hashFiles('.github/workflows/android.yml') }}
+          key: qt-${{ env.QT_VERSION }}-linux-android-arm64-scxml-v1
 
       # install-qt-action fails to resolve 6.8.3 ("No available Qt version found"), so call aqt directly
       - name: Install Qt (host + Android arm64)
@@ -134,9 +137,21 @@ jobs:
           "$BT/apksigner" verify --print-certs "${{ env.APK_NAME }}"
           rm -f release.keystore
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: QGroundControl-sd-crawl-apk
-          path: ${{ runner.temp }}/shadow_build_dir/${{ env.APK_NAME }}
-          if-no-files-found: error
+      # Attached to a pre-release instead of an artifact: release assets do not count
+      # against the Actions artifact storage quota
+      - name: Publish APK to pre-release
+        working-directory: ${{ runner.temp }}/shadow_build_dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH=$(echo "${GITHUB_REF_NAME}" | sed 's#^apk/##; s#[^A-Za-z0-9._-]#-#g')
+          TAG="apk-${BRANCH}-${GITHUB_SHA::9}"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ env.APK_NAME }}" --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "${{ env.APK_NAME }}" -R "$GITHUB_REPOSITORY" \
+              --prerelease --target "$GITHUB_SHA" \
+              --title "APK ${GITHUB_REF_NAME} (${GITHUB_SHA::9})" \
+              --notes "Android arm64 APK built by ${GITHUB_WORKFLOW} run ${GITHUB_RUN_ID} from ${GITHUB_REF_NAME} @ ${GITHUB_SHA}."
+          fi
+          echo "APK: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}" | tee -a "$GITHUB_STEP_SUMMARY"
