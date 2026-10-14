@@ -71,7 +71,7 @@ jobs:
 
       - name: Cache Qt
         id: cache-qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/Qt
           key: qt-${{ env.QT_VERSION }}-linux-android-arm64-scxml-v1
