@@ -90,18 +90,38 @@ jobs:
           echo "QT_ROOT_DIR=$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}/android_arm64_v8a" >> "$GITHUB_ENV"
           ls "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}"
 
+      # Keeps CPM downloads (GStreamer for Android is ~1 GB) between runs
+      - name: Cache CPM downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/cpm-cache
+          key: cpm-android-${{ hashFiles('cmake/**', '**/CMakeLists.txt') }}
+          restore-keys: cpm-android-
+
+      # Retried because the GStreamer download from gstreamer.freedesktop.org
+      # sometimes fails with "HTTP/2 stream reset by server"
       - name: Configure
         working-directory: ${{ runner.temp }}/shadow_build_dir
-        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
-              -DCMAKE_BUILD_TYPE=Release
-              -DCMAKE_WARN_DEPRECATED=FALSE
-              -DQT_HOST_PATH="${{ env.QT_HOST_PATH }}"
-              -DQT_ANDROID_ABIS="${{ env.ANDROID_ABI }}"
-              -DQT_ANDROID_BUILD_ALL_ABIS=OFF
-              -DANDROID_ABI="${{ env.ANDROID_ABI }}"
-              -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
-              -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
-              -DQT_ANDROID_SIGN_APK=OFF
+        run: |
+          for attempt in 1 2 3; do
+            if ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_WARN_DEPRECATED=FALSE \
+                -DCPM_SOURCE_CACHE="$RUNNER_TEMP/cpm-cache" \
+                -DQT_HOST_PATH="${{ env.QT_HOST_PATH }}" \
+                -DQT_ANDROID_ABIS="${{ env.ANDROID_ABI }}" \
+                -DQT_ANDROID_BUILD_ALL_ABIS=OFF \
+                -DANDROID_ABI="${{ env.ANDROID_ABI }}" \
+                -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
+                -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+                -DQT_ANDROID_SIGN_APK=OFF; then
+              exit 0
+            fi
+            echo "::warning::Configure attempt $attempt failed, retrying in 30s"
+            rm -rf _deps/*-subbuild
+            sleep 30
+          done
+          exit 1
 
       - name: Build
         working-directory: ${{ runner.temp }}/shadow_build_dir
