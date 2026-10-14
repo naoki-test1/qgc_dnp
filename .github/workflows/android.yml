@@ -22,7 +22,6 @@ jobs:
       QT_MODULES: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors qtscxml
       ANDROID_ABI: arm64-v8a
       BUILD_TOOLS: 35.0.0
-      GST_VERSION: 1.22.12
       APK_NAME: QGroundControl-sd-crawl.apk
 
     steps:
@@ -91,67 +90,18 @@ jobs:
           echo "QT_ROOT_DIR=$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}/android_arm64_v8a" >> "$GITHUB_ENV"
           ls "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}"
 
-      # Keeps CPM downloads (GStreamer for Android is ~1 GB) between runs
-      - name: Cache CPM downloads
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/cpm-cache
-          key: cpm-android-${{ hashFiles('cmake/**', '**/CMakeLists.txt') }}
-          restore-keys: cpm-android-
-
-      # GStreamer for Android is downloaded here instead of by CPM: CPM's download from
-      # gstreamer.freedesktop.org fails with "HTTP/2 stream reset by server", and a failed
-      # attempt leaves an empty source dir that later attempts reuse
-      - name: Cache GStreamer for Android
-        id: cache-gst
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/gstreamer-android
-          key: gstreamer-android-${{ env.GST_VERSION }}-arm64
-
-      - name: Download GStreamer for Android
-        if: steps.cache-gst.outputs.cache-hit != 'true'
-        working-directory: ${{ runner.temp }}
-        run: |
-          BASE="https://gstreamer.freedesktop.org/data/pkg/android/${GST_VERSION}"
-          FILE="gstreamer-1.0-android-universal-${GST_VERSION}.tar.xz"
-          curl -fL --http1.1 --retry 10 --retry-all-errors --retry-delay 10 -C - -o "$FILE" "$BASE/$FILE"
-          curl -fL --http1.1 --retry 10 --retry-all-errors -o "$FILE.sha256sum" "$BASE/$FILE.sha256sum"
-          echo "$(cut -d' ' -f1 "$FILE.sha256sum")  $FILE" | sha256sum -c -
-          mkdir -p gstreamer-android
-          tar -xJf "$FILE" -C gstreamer-android --wildcards '*arm64/*'
-          rm -f "$FILE"
-          # FindGStreamer.cmake expects <source>/arm64; flatten a top-level wrapper dir if present
-          if [ ! -d gstreamer-android/arm64 ]; then
-            mv "$(find gstreamer-android -maxdepth 3 -type d -name arm64 | head -1)" gstreamer-android/arm64
-          fi
-          ls gstreamer-android
-          test -d gstreamer-android/arm64/lib
-
-      # Retried in case another CPM download fails transiently
       - name: Configure
         working-directory: ${{ runner.temp }}/shadow_build_dir
-        run: |
-          for attempt in 1 2 3; do
-            if ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_WARN_DEPRECATED=FALSE \
-                -DCPM_SOURCE_CACHE="$RUNNER_TEMP/cpm-cache" \
-                -DCPM_gstreamer_SOURCE="$RUNNER_TEMP/gstreamer-android" \
-                -DQT_HOST_PATH="${{ env.QT_HOST_PATH }}" \
-                -DQT_ANDROID_ABIS="${{ env.ANDROID_ABI }}" \
-                -DQT_ANDROID_BUILD_ALL_ABIS=OFF \
-                -DANDROID_ABI="${{ env.ANDROID_ABI }}" \
-                -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
-                -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
-                -DQT_ANDROID_SIGN_APK=OFF; then
-              exit 0
-            fi
-            echo "::warning::Configure attempt $attempt failed, retrying in 30s"
-            rm -rf _deps/*-subbuild
-            sleep 30
-          done
-          exit 1
+        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
+              -DCMAKE_BUILD_TYPE=Release
+              -DCMAKE_WARN_DEPRECATED=FALSE
+              -DQT_HOST_PATH="${{ env.QT_HOST_PATH }}"
+              -DQT_ANDROID_ABIS="${{ env.ANDROID_ABI }}"
+              -DQT_ANDROID_BUILD_ALL_ABIS=OFF
+              -DANDROID_ABI="${{ env.ANDROID_ABI }}"
+              -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+              -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+              -DQT_ANDROID_SIGN_APK=OFF
 
       - name: Build
         working-directory: ${{ runner.temp }}/shadow_build_dir
