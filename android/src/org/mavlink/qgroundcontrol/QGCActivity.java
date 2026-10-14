@@ -46,6 +46,7 @@ public class QGCActivity extends QtActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         writeStartupLog(this, "QGCActivity onCreate start");
+        useCutoutArea();
         try {
             super.onCreate(savedInstanceState);
             writeStartupLog(this, "QGCActivity onCreate after super");
@@ -103,6 +104,17 @@ public class QGCActivity extends QtActivity {
             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
             | View.SYSTEM_UI_FLAG_FULLSCREEN
         );
+    }
+
+    /**
+     * Lets the window extend into the display cutout (notch). Without this, landscape
+     * fullscreen leaves a black strip beside the cutout while Qt still lays out for the
+     * full display width, so the right edge of the UI is cut off on notched phones.
+     */
+    private void useCutoutArea() {
+        final WindowManager.LayoutParams params = getWindow().getAttributes();
+        params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        getWindow().setAttributes(params);
     }
 
     /**
